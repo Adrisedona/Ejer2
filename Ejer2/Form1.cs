@@ -15,7 +15,7 @@ using System.Windows.Forms;
 
 namespace Ejer2
 {
-    delegate void Delegate(FileInfo file, string needle, ListBox lst, Button btn);
+    delegate void Delegate(FileInfo file, string needle, ListBox lst, Form frm);
 
     public partial class Form1 : Form
     {
@@ -82,7 +82,7 @@ namespace Ejer2
             {
                 lstResult.Items.Clear();
                 files = new DirectoryInfo(txtDir.Text).GetFiles().Where(f => extensions.Contains(f.Extension)).ToArray();
-                btnSearch.Enabled = false;
+                this.Enabled = false;
                 corrupts = 0;
                 foreach (FileInfo file in files)
                 {
@@ -97,7 +97,7 @@ namespace Ejer2
             }
         }
 
-        private void Search(FileInfo file, string needle, ListBox lst, Button btn)
+        private void Search(FileInfo file, string needle, ListBox lst, Form frm)
         {
             if (!chkSensitive.Checked)
             {
@@ -126,14 +126,14 @@ namespace Ejer2
             }
             lock (files)
             {
-                btn.Enabled = files.Length - corrupts == lst.Items.Count;
+                frm.Enabled = files.Length - corrupts == lst.Items.Count;
             }
         }
 
         private void ThreadSearch(object file)
         {
             Delegate d = Search;
-            this.Invoke(d, file, txtString.Text.Trim(), lstResult, btnSearch);
+            this.Invoke(d, file, txtString.Text.Trim(), lstResult, this);
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
