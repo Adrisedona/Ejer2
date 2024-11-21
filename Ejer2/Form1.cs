@@ -15,12 +15,11 @@ using System.Windows.Forms;
 
 namespace Ejer2
 {
-    delegate void Delegate(FileInfo file, string needle, ListBox lst, Form frm);
+    delegate void Delegate(ListBox lst);
 
     public partial class Form1 : Form
     {
         string[] extensions;
-        private int corrupts;
         static string PATH = Environment.GetEnvironmentVariable("userprofile") + "\\extensions.txt";
         FileInfo[] files;
         public Form1()
@@ -78,62 +77,63 @@ namespace Ejer2
             {
                 SetExtensions(false);
             }
-            if (Directory.Exists(txtDir.Text) && txtString.Text != "")
+            try
             {
-                lstResult.Items.Clear();
-                files = new DirectoryInfo(txtDir.Text).GetFiles().Where(f => extensions.Contains(f.Extension)).ToArray();
-                this.Enabled = false;
-                corrupts = 0;
-                foreach (FileInfo file in files)
+                if (Directory.Exists(txtDir.Text) && txtString.Text != "")
                 {
-                    Thread thread = new Thread(ThreadSearch);
-                    thread.IsBackground = true;
-                    thread.Start(file);
+                    lstResult.Items.Clear();
+                    files = new DirectoryInfo(txtDir.Text).GetFiles().Where(f => extensions.Contains(f.Extension)).ToArray();
+                    foreach (FileInfo file in files)
+                    {
+                        Thread thread = new Thread(Search);
+                        thread.IsBackground = true;
+                        thread.Start(file);
+                    }
+                }
+                else
+                {
+                    throw new ArgumentException();
                 }
             }
-            else
+            catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException || ex is ArgumentException)
             {
-                MessageBox.Show(!Directory.Exists(txtDir.Text) ? "Invalid directory" : "No string to search", "Searh error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(!Directory.Exists(txtDir.Text) ? "Invalid directory" : (ex is ArgumentException ? "No string to search" : "No permission to access the directory"), "Searh error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+            
         }
 
-        private void Search(FileInfo file, string needle, ListBox lst, Form frm)
+        private void Search(object fileInfo)
         {
-            if (!chkSensitive.Checked)
-            {
-                needle = needle.ToLower();
-            }
+            FileInfo file = fileInfo as FileInfo;
+            string needle = !chkSensitive.Checked ? txtString.Text.ToLower() : txtString.Text;
             string fileContent;
             int finds;
             try
             {
                 using (StreamReader reader = new StreamReader(file.FullName))
                 {
+                    //Más correcto que sea linea a linea
                     fileContent = chkSensitive.Checked ? reader.ReadToEnd() : reader.ReadToEnd().ToLower();
                 }
                 finds = new Regex(Regex.Escape(needle)).Matches(fileContent).Count;
-                lock (lst)
+                lock (lstResult)
                 {
-                    lst.Items.Add($"{file.Name}-------{finds}");
+                    Delegate d = lst => lst.Items.Add($"{file.Name}-------{finds}");
+                    this.Invoke(d, lstResult);
                 }
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException || ex is ArgumentException)
+            catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException || ex is ArgumentException || ex is OutOfMemoryException)
             {
-                lock ((object)corrupts)
+                lock (lstResult)
                 {
-                    corrupts++;
+                    Delegate d = lst => lst.Items.Add("Memoria insuficiente para realizar la operación");
+                    this.Invoke(d, lstResult);
                 }
             }
-            lock (files)
-            {
-                frm.Enabled = files.Length - corrupts == lst.Items.Count;
-            }
-        }
-
-        private void ThreadSearch(object file)
-        {
-            Delegate d = Search;
-            this.Invoke(d, file, txtString.Text.Trim(), lstResult, this);
+            //lock (files)
+            //{
+            //    frm.Enabled = files.Length - corrupts == lst.Items.Count;
+            //}
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
