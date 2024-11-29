@@ -106,27 +106,32 @@ namespace Ejer2
         {
             FileInfo file = fileInfo as FileInfo;
             string needle = !chkSensitive.Checked ? txtString.Text.ToLower() : txtString.Text;
-            string fileContent;
-            int finds;
-            try
+            int finds = 0;
+			string line;
+			Regex regex = new Regex(Regex.Escape(needle));
+
+			try
             {
                 using (StreamReader reader = new StreamReader(file.FullName))
                 {
                     //Más correcto que sea linea a linea
-                    fileContent = chkSensitive.Checked ? reader.ReadToEnd() : reader.ReadToEnd().ToLower();
+					while ((line = reader.ReadLine()) != null)
+					{
+						finds += regex.Matches(chkSensitive.Checked ? line : line.ToLower()).Count;
+					}
                 }
-                finds = new Regex(Regex.Escape(needle)).Matches(fileContent).Count;
+                
                 lock (lstResult)
                 {
                     Delegate d = lst => lst.Items.Add($"{file.Name}-------{finds}");
                     this.Invoke(d, lstResult);
                 }
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException || ex is ArgumentException || ex is OutOfMemoryException)
+            catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException || ex is ArgumentException)
             {
                 lock (lstResult)
                 {
-                    Delegate d = lst => lst.Items.Add("Memoria insuficiente para realizar la operación");
+                    Delegate d = lst => lst.Items.Add("Archivo erroneo");
                     this.Invoke(d, lstResult);
                 }
             }
